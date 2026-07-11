@@ -41,6 +41,25 @@ directement sur le serveur :
 curl -fsSL https://raw.githubusercontent.com/Simon256px/server-monitor/main/install.sh | sudo bash
 ```
 
+### Variante binaire compilé (Go) — encore plus sobre
+
+Même dashboard, même API, mais **un seul binaire statique** (~6 Mo sur disque,
+~8-12 Mo de RAM au lieu de ~15 Mo pour Python). À compiler une fois sur n'importe
+quelle machine avec [Go](https://go.dev/dl/) installé (compilation croisée intégrée) :
+
+```bash
+# binaire pour serveur Linux x86_64 (dist/server-monitor-linux-x64)
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s -w" -o dist/server-monitor-linux-x64 .
+# pour ARM64 : GOARCH=arm64 → dist/server-monitor-linux-arm64
+```
+
+Puis même installation, avec le drapeau `--binary` :
+
+```bash
+scp -r server-monitor utilisateur@IP_DU_SERVEUR:~/    # le dossier avec dist/
+sudo bash ~/server-monitor/install.sh --binary
+```
+
 ### À la main — tester sans rien installer
 
 ```bash
@@ -117,10 +136,12 @@ C'est tout. ~600 lignes au total, Python ≥ 3.8.
 
 | Techno | Rôle |
 |---|---|
-| Python 3 stdlib (déjà dans Linux) | serveur HTTP + collecte des stats |
+| Python 3 stdlib (déjà dans Linux) — **ou** binaire Go statique | serveur HTTP + collecte des stats |
 | HTML/CSS/JS vanilla (un seul fichier, aucun asset externe) | dashboard |
 
-Aucune installation, aucune dépendance, aucun build.
+Aucune installation sur le serveur, aucune dépendance, aucun build web.
+Les deux implémentations exposent la même API et embarquent le même dashboard —
+choisissez : Python (zéro préparation) ou Go (empreinte mémoire minimale).
 
 ## Licence
 

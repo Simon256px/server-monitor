@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # server-monitor — installation en une commande (Ubuntu/Debian avec systemd)
 #
-#   Depuis une copie du repo :   sudo bash install.sh
+#   Version Python (rien à installer) :   sudo bash install.sh
+#   Version binaire Go (~5 Mo de RAM) :   sudo bash install.sh --binary
+#     (le binaire dist/server-monitor-linux-<arch> doit être à côté du script,
+#      compilé avec : go build — voir README)
 #   Ou à distance (repo public requis) :
 #     curl -fsSL https://raw.githubusercontent.com/Simon256px/server-monitor/main/install.sh | sudo bash
 #
@@ -11,24 +14,44 @@ set -euo pipefail
 
 REPO_RAW="https://raw.githubusercontent.com/Simon256px/server-monitor/main"
 DEST="/opt/server-monitor"
+MODE="python"
+[ "${1:-}" = "--binary" ] && MODE="binary"
 
 [ "$(id -u)" -eq 0 ] || { echo "Lancez avec sudo : sudo bash install.sh"; exit 1; }
-command -v python3 >/dev/null || { echo "python3 introuvable (il est pourtant inclus dans Ubuntu/Debian)"; exit 1; }
 command -v systemctl >/dev/null || { echo "systemd requis"; exit 1; }
 
 mkdir -p "$DEST/public"
-
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-.}")" && pwd)"
-if [ -f "$DIR/server.py" ]; then
-  echo "-> installation depuis la copie locale ($DIR)"
-  cp "$DIR/server.py" "$DEST/server.py"
-  cp "$DIR/public/index.html" "$DEST/public/index.html"
+
+if [ "$MODE" = "binary" ]; then
+  case "$(uname -m)" in
+    x86_64) SUF="x64" ;;
+    aarch64) SUF="arm64" ;;
+    *) echo "architecture $(uname -m) non gérée — utilisez la version Python"; exit 1 ;;
+  esac
+  BIN=""
+  for c in "$DIR/dist/server-monitor-linux-$SUF" "$DIR/server-monitor-linux-$SUF"; do
+    [ -f "$c" ] && BIN="$c" && break
+  done
+  [ -n "$BIN" ] || { echo "binaire server-monitor-linux-$SUF introuvable à côté du script"; exit 1; }
+  echo "-> installation du binaire ($BIN)"
+  cp "$BIN" "$DEST/server-monitor"
+  chmod 755 "$DEST/server-monitor"
+  EXEC="$DEST/server-monitor"
 else
-  echo "-> téléchargement depuis GitHub"
-  curl -fsSL "$REPO_RAW/server.py" -o "$DEST/server.py"
-  curl -fsSL "$REPO_RAW/public/index.html" -o "$DEST/public/index.html"
+  command -v python3 >/dev/null || { echo "python3 introuvable (il est pourtant inclus dans Ubuntu/Debian)"; exit 1; }
+  if [ -f "$DIR/server.py" ]; then
+    echo "-> installation depuis la copie locale ($DIR)"
+    cp "$DIR/server.py" "$DEST/server.py"
+    cp "$DIR/public/index.html" "$DEST/public/index.html"
+  else
+    echo "-> téléchargement depuis GitHub"
+    curl -fsSL "$REPO_RAW/server.py" -o "$DEST/server.py"
+    curl -fsSL "$REPO_RAW/public/index.html" -o "$DEST/public/index.html"
+  fi
+  chmod 644 "$DEST/server.py" "$DEST/public/index.html"
+  EXEC="$(command -v python3) $DEST/server.py"
 fi
-chmod 644 "$DEST/server.py" "$DEST/public/index.html"
 
 cat > /etc/systemd/system/server-monitor.service <<EOF
 [Unit]
@@ -36,7 +59,7 @@ Description=server-monitor
 After=network.target
 
 [Service]
-ExecStart=$(command -v python3) $DEST/server.py
+ExecStart=$EXEC
 Environment=HOST=127.0.0.1
 Restart=always
 User=nobody
