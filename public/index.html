@@ -279,7 +279,7 @@
   async function tick() {
     let s;
     try {
-      s = await (await fetch('/api/stats')).json();
+      s = await (await fetch('api/stats')).json(); // relative → works behind an nginx path prefix
     } catch {
       $('refreshed').textContent = 'connection lost — retrying…';
       return;

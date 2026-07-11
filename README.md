@@ -78,6 +78,44 @@ sudo systemctl enable --now server-monitor
 > exposé à Internet, limitez le port 3000 à votre IP (`ufw allow from VOTRE_IP to any port 3000`)
 > ou placez-le derrière un reverse proxy avec auth.
 
+### Derrière nginx (recommandé)
+
+Aucun port à ouvrir : Node reste en interne sur `127.0.0.1` et nginx (déjà sur 80/443) fait le pont.
+
+1. Dans le service systemd, ajoutez sous `[Service]` :
+   ```ini
+   Environment=HOST=127.0.0.1
+   ```
+
+2. Dans votre config nginx, **au choix** :
+
+   **Sous-chemin** — `http://votre-domaine/monitor/` :
+   ```nginx
+   location /monitor/ {
+       proxy_pass http://127.0.0.1:3000/;
+   }
+   location = /monitor { return 301 /monitor/; }
+   ```
+
+   **Sous-domaine** — `http://monitor.votre-domaine` :
+   ```nginx
+   server {
+       listen 80;
+       server_name monitor.votre-domaine;
+       location / {
+           proxy_pass http://127.0.0.1:3000;
+       }
+   }
+   ```
+
+3. `sudo nginx -t && sudo systemctl reload nginx`
+
+Pour protéger l'accès par mot de passe, ajoutez dans le bloc `location` :
+```nginx
+auth_basic "monitor";
+auth_basic_user_file /etc/nginx/.htpasswd;   # créé avec : htpasswd -c /etc/nginx/.htpasswd simon
+```
+
 ## Stack
 
 | Techno | Rôle |
