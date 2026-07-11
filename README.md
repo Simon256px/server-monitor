@@ -4,6 +4,8 @@ Moniteur de serveur ultra-léger qui n'utilise **que ce qui est déjà dans Linu
 Python 3 (préinstallé sur Ubuntu/Debian) et sa bibliothèque standard.
 **Rien à installer** — ni runtime, ni paquet, ni dépendance. Deux fichiers.
 
+<img width="1920" height="951" alt="monitor" src="https://github.com/user-attachments/assets/b9439df3-116d-4747-a637-e0741b2aa327" />
+
 ## Ce que ça affiche
 
 Dashboard **plein écran, sans défilement** — 7 métriques, rien d'autre :
