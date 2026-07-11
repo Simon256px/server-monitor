@@ -7,7 +7,17 @@ const os = require('os');
 const { execFile } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0'; // all interfaces — reachable via the server's IP
 const HISTORY_SIZE = 120; // 2 minutes of 1s samples
+
+// friendly OS name (on linux, os.version() is a kernel string)
+let osName = os.version();
+if (process.platform === 'linux') {
+  try {
+    const m = fs.readFileSync('/etc/os-release', 'utf8').match(/^PRETTY_NAME="?([^"\n]+?)"?$/m);
+    if (m) osName = m[1];
+  } catch {}
+}
 
 // ---- CPU sampling (usage = 1 - idle delta / total delta) ----
 function cpuTimes() {
@@ -117,7 +127,7 @@ setInterval(() => {
 function stats() {
   return {
     hostname: os.hostname(),
-    os: os.version(),
+    os: osName,
     platform: `${os.platform()} ${os.arch()}`,
     node: process.version,
     uptime: Math.round(os.uptime()),
@@ -146,4 +156,9 @@ http
       res.end(html);
     });
   })
-  .listen(PORT, () => console.log(`server-monitor → http://localhost:${PORT}`));
+  .listen(PORT, HOST, () => {
+    console.log(`server-monitor → http://localhost:${PORT}`);
+    for (const ifaces of Object.values(os.networkInterfaces()))
+      for (const i of ifaces)
+        if (i.family === 'IPv4' && !i.internal) console.log(`                 http://${i.address}:${PORT}`);
+  });
