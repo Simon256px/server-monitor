@@ -1,8 +1,0 @@
-{
-  "tasks": {
-    "dev": "deno run --allow-net --allow-env --allow-sys --allow-read --allow-run=netstat,df main.ts",
-    "compile:linux": "deno compile --allow-net --allow-env --allow-sys --allow-read --allow-run=netstat,df --include public/index.html --target x86_64-unknown-linux-gnu --output dist/server-monitor-linux-x64 main.ts",
-    "compile:linux-arm": "deno compile --allow-net --allow-env --allow-sys --allow-read --allow-run=netstat,df --include public/index.html --target aarch64-unknown-linux-gnu --output dist/server-monitor-linux-arm64 main.ts",
-    "compile:windows": "deno compile --allow-net --allow-env --allow-sys --allow-read --allow-run=netstat,df --include public/index.html --target x86_64-pc-windows-msvc --output dist/server-monitor-windows-x64.exe main.ts"
-  }
-}
