@@ -52,3 +52,7 @@ Aucune dépendance npm, aucun build, aucun service tiers.
 - `public/index.html` (autonome, aucun asset externe) rafraîchit toutes les 2 s
 
 C'est tout. ~500 lignes au total.
+
+## Licence
+
+[MIT](LICENSE)
