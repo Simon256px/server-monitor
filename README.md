@@ -18,23 +18,39 @@ Dashboard **plein écran, sans défilement** — 7 métriques, rien d'autre :
 
 ## Installer sur un serveur Linux
 
-Python 3 est déjà sur le serveur (`python3 --version` pour s'en convaincre).
-Copiez les deux fichiers, lancez :
+Rien à installer : Python 3 est déjà sur le serveur (`python3 --version`).
+
+### En une commande (recommandé)
+
+Copiez le dossier sur le serveur, puis lancez le script :
 
 ```bash
-scp server.py utilisateur@IP_DU_SERVEUR:~/
-scp -r public utilisateur@IP_DU_SERVEUR:~/
+# depuis votre machine
+scp -r server-monitor utilisateur@IP_DU_SERVEUR:~/
+
+# sur le serveur
+sudo bash ~/server-monitor/install.sh
 ```
 
+Le script installe dans `/opt/server-monitor`, crée le service systemd
+(démarrage au boot, redémarrage auto), vérifie que l'API répond et affiche
+le bloc nginx à ajouter. Si le repo est public, encore plus court —
+directement sur le serveur :
+
 ```bash
-# sur le serveur
-python3 ~/server.py
+curl -fsSL https://raw.githubusercontent.com/Simon256px/server-monitor/main/install.sh | sudo bash
+```
+
+### À la main — tester sans rien installer
+
+```bash
+python3 server.py
 ```
 
 C'est tout — le dashboard est sur `http://IP_DU_SERVEUR:3000` (les URL exactes
 s'affichent au démarrage ; port via `PORT`, interface via `HOST`).
 
-### Lancer au démarrage (systemd)
+### À la main — lancer au démarrage (systemd)
 
 ```bash
 sudo mkdir -p /opt/server-monitor
