@@ -99,8 +99,12 @@ function readDisk() {
     if (!err) disk = { total: s.blocks * s.bsize, free: s.bavail * s.bsize };
   });
 }
-readDisk();
-setInterval(readDisk, 15000);
+if (fs.statfs) {
+  readDisk();
+  setInterval(readDisk, 15000);
+} else {
+  console.warn(`node ${process.version}: fs.statfs unavailable (needs >= 18.15) — DISK tile will stay empty`);
+}
 
 // ---- 1s sampler → ring buffer ----
 const history = [];
