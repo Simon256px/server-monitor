@@ -4,7 +4,7 @@ Moniteur de serveur ultra-léger, **zéro dépendance** — un fichier Node.js +
 
 ## Prérequis
 
-**Node.js ≥ 18**. C'est tout — pas de npm install, pas de base de données, pas de framework.
+**Node.js ≥ 18.15**. C'est tout — pas de npm install, pas de base de données, pas de framework.
 
 ## Installation
 
@@ -18,10 +18,15 @@ Pas de git ? Télécharger le [ZIP](https://github.com/Simon256px/server-monitor
 
 ## Ce que ça affiche
 
-- **Jauge CPU** en temps réel (arc de ticks, style rétro-terminal)
-- **Mémoire** utilisée / libre / totale
-- **Historique 2 minutes** (CPU, mémoire, cœur le plus chargé) en matrice de points
-- Tendances ↑↓ sur la dernière minute, uptime, infos machine
+Dashboard **plein écran, sans défilement** — 7 métriques, rien d'autre :
+
+- **CPU** — jauge en arc de ticks + historique 2 min en matrice de points
+- **RAM** — % utilisé, Go utilisés / totaux + historique
+- **Disk** — % utilisé du volume courant, barre de points
+- **Uptime** — durée + date de démarrage
+- **Network speed** — débit ↓↑ en direct + historique
+- **Traffic** — octets ↓↑ cumulés depuis le boot
+- **OS** — version, architecture, hostname, version Node
 
 ## Lancer
 
@@ -42,8 +47,8 @@ Aucune dépendance npm, aucun build, aucun service tiers.
 
 ## Comment ça marche
 
-- `server.js` échantillonne `os.cpus()` chaque seconde et garde 2 minutes d'historique en mémoire
-- `/api/stats` renvoie le tout en JSON
+- `server.js` échantillonne CPU/RAM chaque seconde (`os.cpus()`), le disque via `fs.statfs` et le réseau via `netstat` / `/proc/net/dev` (natif Windows · Linux · macOS)
+- `/api/stats` renvoie le tout en JSON, avec 2 minutes d'historique
 - `public/index.html` (autonome, aucun asset externe) rafraîchit toutes les 2 s
 
-C'est tout. ~350 lignes au total.
+C'est tout. ~500 lignes au total.
