@@ -326,7 +326,7 @@
     $('tr-up').textContent = bytes(s.net.tx);
 
     // os
-    $('os-lines').innerHTML = `<b>${s.os}</b>${s.platform} · ${s.coreCount} cores<br>${s.hostname}<br>node ${s.node}`;
+    $('os-lines').innerHTML = `<b>${s.os}</b>${s.platform} · ${s.coreCount} cores<br>${s.hostname}<br>${s.runtime}`;
 
     $('sr').textContent = `CPU ${s.cpu}%, RAM ${memPct}%, uptime ${ago(s.uptime)}, down ${rate(s.net.rxs)}`;
   }

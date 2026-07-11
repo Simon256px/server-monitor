@@ -1,20 +1,8 @@
 # server-monitor
 
-Moniteur de serveur ultra-léger, **zéro dépendance** — un fichier Node.js + un dashboard HTML.
-
-## Prérequis
-
-**Node.js ≥ 18.15**. C'est tout — pas de npm install, pas de base de données, pas de framework.
-
-## Installation
-
-```bash
-git clone https://github.com/Simon256px/server-monitor.git
-cd server-monitor
-node server.js
-```
-
-Pas de git ? Télécharger le [ZIP](https://github.com/Simon256px/server-monitor/archive/refs/heads/main.zip), extraire, puis `node server.js`.
+Moniteur de serveur ultra-léger construit avec **une seule techno : [Deno](https://deno.com)**
+(TypeScript). Il se compile en **un binaire autonome** : rien à installer sur le serveur —
+ni runtime, ni paquet, ni base de données.
 
 ## Ce que ça affiche
 
@@ -26,112 +14,112 @@ Dashboard **plein écran, sans défilement** — 7 métriques, rien d'autre :
 - **Uptime** — durée + date de démarrage
 - **Network speed** — débit ↓↑ en direct + historique
 - **Traffic** — octets ↓↑ cumulés depuis le boot
-- **OS** — version, architecture, hostname, version Node
+- **OS** — version, architecture, hostname, runtime
 
-## Lancer
+## Installer sur un serveur Linux
 
-```bash
-node server.js
-```
-
-Puis ouvrir **http://localhost:3000** (port configurable via `PORT`).
-
-## Déployer sur un serveur Linux
+**Un seul fichier à copier.** Depuis une machine où le binaire est compilé
+(voir « Compiler » ci-dessous) :
 
 ```bash
-# 1. Node.js ≥ 18.15 (Debian/Ubuntu)
-sudo apt install -y nodejs        # ou via nodesource si la version apt est trop vieille
-
-# 2. Récupérer et lancer
-git clone https://github.com/Simon256px/server-monitor.git
-cd server-monitor
-node server.js
+scp dist/server-monitor-linux-x64 utilisateur@IP_DU_SERVEUR:~/server-monitor-bin
 ```
 
-Le serveur écoute sur **toutes les interfaces** (`0.0.0.0`) : le dashboard est
-accessible sur `http://IP_DU_SERVEUR:3000`. Les URL exactes s'affichent au démarrage.
-Si un pare-feu tourne : `sudo ufw allow 3000/tcp`.
+Puis sur le serveur :
+
+```bash
+chmod +x ~/server-monitor-bin
+./server-monitor-bin
+```
+
+C'est tout — le dashboard est sur `http://IP_DU_SERVEUR:3000` (les URL exactes
+s'affichent au démarrage ; port via `PORT`, interface via `HOST`).
 
 ### Lancer au démarrage (systemd)
 
-```ini
-# /etc/systemd/system/server-monitor.service
+```bash
+sudo mkdir -p /opt/server-monitor
+sudo mv ~/server-monitor-bin /opt/server-monitor/server-monitor
+sudo chmod 755 /opt/server-monitor/server-monitor
+
+sudo tee /etc/systemd/system/server-monitor.service > /dev/null <<'EOF'
 [Unit]
 Description=server-monitor
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/node /opt/server-monitor/server.js
+ExecStart=/opt/server-monitor/server-monitor
+Environment=HOST=127.0.0.1
 Restart=always
 User=nobody
 
 [Install]
 WantedBy=multi-user.target
-```
+EOF
 
-```bash
-sudo cp -r server-monitor /opt/
+sudo systemctl daemon-reload
 sudo systemctl enable --now server-monitor
 ```
 
-> ⚠️ Le dashboard est en lecture seule mais sans authentification : sur un serveur
-> exposé à Internet, limitez le port 3000 à votre IP (`ufw allow from VOTRE_IP to any port 3000`)
-> ou placez-le derrière un reverse proxy avec auth.
+> `HOST=127.0.0.1` = port 3000 invisible de l'extérieur, prévu pour passer par nginx
+> ci-dessous. Pour exposer directement le port : retirez cette ligne et
+> `sudo ufw allow 3000/tcp`.
 
 ### Derrière nginx (recommandé)
 
-Aucun port à ouvrir : Node reste en interne sur `127.0.0.1` et nginx (déjà sur 80/443) fait le pont.
+Aucun port à ouvrir : nginx (déjà sur 80/443) fait le pont. Dans le bloc
+`server { ... }` de votre site :
 
-1. Dans le service systemd, ajoutez sous `[Service]` :
-   ```ini
-   Environment=HOST=127.0.0.1
-   ```
+```nginx
+location /monitor/ {
+    proxy_pass http://127.0.0.1:3000/;
+}
+location = /monitor { return 301 /monitor/; }
+```
 
-2. Dans votre config nginx, **au choix** :
-
-   **Sous-chemin** — `http://votre-domaine/monitor/` :
-   ```nginx
-   location /monitor/ {
-       proxy_pass http://127.0.0.1:3000/;
-   }
-   location = /monitor { return 301 /monitor/; }
-   ```
-
-   **Sous-domaine** — `http://monitor.votre-domaine` :
-   ```nginx
-   server {
-       listen 80;
-       server_name monitor.votre-domaine;
-       location / {
-           proxy_pass http://127.0.0.1:3000;
-       }
-   }
-   ```
-
-3. `sudo nginx -t && sudo systemctl reload nginx`
+Puis `sudo nginx -t && sudo systemctl reload nginx` →
+dashboard sur `http://votre-domaine/monitor/`.
 
 Pour protéger l'accès par mot de passe, ajoutez dans le bloc `location` :
+
 ```nginx
 auth_basic "monitor";
 auth_basic_user_file /etc/nginx/.htpasswd;   # créé avec : htpasswd -c /etc/nginx/.htpasswd simon
 ```
 
+## Compiler / développer
+
+Prérequis : [Deno](https://docs.deno.com/runtime/getting_started/installation/) ≥ 2.1
+(un binaire lui aussi — `curl -fsSL https://deno.land/install.sh | sh`).
+
+```bash
+deno task dev                # lancer depuis les sources
+deno task compile:linux      # binaire Linux x86_64  → dist/
+deno task compile:linux-arm  # binaire Linux ARM64   → dist/
+deno task compile:windows    # binaire Windows       → dist/
+```
+
+La compilation croisée fonctionne depuis n'importe quel OS (le dashboard HTML est
+embarqué dans le binaire).
+
+## Comment ça marche
+
+- `main.ts` échantillonne chaque seconde : CPU (`/proc/stat` sous Linux), RAM,
+  disque (`statfs`), réseau (`/proc/net/dev` sous Linux, `netstat` sinon), et garde
+  2 minutes d'historique en mémoire
+- `/api/stats` renvoie le tout en JSON
+- `public/index.html` (autonome, aucun asset externe) rafraîchit toutes les 2 s
+
+C'est tout. ~550 lignes au total.
+
 ## Stack
 
 | Techno | Rôle |
 |---|---|
-| Node.js (modules natifs `http`, `os`, `fs`) | serveur + collecte des stats |
-| HTML/CSS/JS vanilla (un seul fichier, aucun asset externe) | dashboard |
+| Deno (TypeScript, API natives + compat `node:os`/`node:fs`) | serveur + collecte + compilation en binaire |
+| HTML/CSS/JS vanilla (un seul fichier, embarqué dans le binaire) | dashboard |
 
-Aucune dépendance npm, aucun build, aucun service tiers.
-
-## Comment ça marche
-
-- `server.js` échantillonne CPU/RAM chaque seconde (`os.cpus()`), le disque via `fs.statfs` et le réseau via `netstat` / `/proc/net/dev` (natif Windows · Linux · macOS)
-- `/api/stats` renvoie le tout en JSON, avec 2 minutes d'historique
-- `public/index.html` (autonome, aucun asset externe) rafraîchit toutes les 2 s
-
-C'est tout. ~500 lignes au total.
+Aucune dépendance externe, aucun `npm install`, aucun build web.
 
 ## Licence
 
