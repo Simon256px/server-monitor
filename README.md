@@ -121,6 +121,50 @@ auth_basic "monitor";
 auth_basic_user_file /etc/nginx/.htpasswd;   # créé avec : htpasswd -c /etc/nginx/.htpasswd simon
 ```
 
+### Sur un sous-domaine dédié (ex. `monitor.exemple.com`)
+
+Plus propre quand on a déjà d'autres sites sur le serveur : le moniteur a son
+propre nom, son propre certificat, et ne touche pas aux configs existantes.
+
+1. **DNS** : créez un enregistrement `A` `monitor` → l'IP du serveur.
+
+2. **Mot de passe** (sans installer `apache2-utils`, `openssl` suffit) :
+   ```bash
+   printf "simon:$(openssl passwd -apr1)\n" | sudo tee /etc/nginx/.htpasswd
+   ```
+
+3. **Bloc nginx dédié** (HTTP d'abord, pour que Certbot puisse valider) :
+   ```bash
+   sudo tee /etc/nginx/sites-available/monitor.exemple.com > /dev/null <<'EOF'
+   server {
+       listen 80;
+       listen [::]:80;
+       server_name monitor.exemple.com;
+
+       location / {
+           proxy_pass http://127.0.0.1:3000/;
+           auth_basic "server-monitor";
+           auth_basic_user_file /etc/nginx/.htpasswd;
+       }
+   }
+   EOF
+   sudo ln -s /etc/nginx/sites-available/monitor.exemple.com /etc/nginx/sites-enabled/monitor.exemple.com
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+4. **HTTPS** une fois le DNS propagé (`getent hosts monitor.exemple.com` doit
+   répondre l'IP) :
+   ```bash
+   sudo certbot --nginx -d monitor.exemple.com
+   ```
+
+> Pièges vécus : le lien symbolique dans `sites-enabled/` doit exister sinon le
+> bloc n'est jamais chargé (`ls -la /etc/nginx/sites-enabled/` pour vérifier) ;
+> et testez toujours avec **`sudo nginx -t`** — sans `sudo`, on obtient un faux
+> « Permission denied » sur les certificats. Vérifiez le résultat côté serveur
+> avec `curl -sI https://monitor.exemple.com` : un `401` + `WWW-Authenticate`
+> confirme que le moniteur répond (le reste n'est que du cache navigateur).
+
 ## Comment ça marche
 
 - `server.py` (bibliothèque standard uniquement) échantillonne chaque seconde :
