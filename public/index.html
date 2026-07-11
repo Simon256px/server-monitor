@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>server-monitor</title>
+<style>
+  :root {
+    --page: #eceded;
+    --shell: #0d100f;
+    --card: #151917;
+    --row: #1b201d;
+    --border: rgba(255, 255, 255, 0.06);
+    --ink: #e9ebea;
+    --muted: #8b938f;
+    --faint: #565e5a;
+    --green: #34d399;
+    --red: #f87171;
+    --dot-off: rgba(255, 255, 255, 0.07);
+    --mono: "JetBrains Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--page);
+    font-family: var(--mono);
+    color: var(--ink);
+    padding: 40px 16px;
+    display: flex;
+    justify-content: center;
+  }
+  .shell {
+    background: var(--shell);
+    border-radius: 24px;
+    padding: 28px;
+    width: 100%;
+    max-width: 1060px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+  }
+
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #2b332f, #11141312);
+    border: 1px solid var(--border);
+    display: grid; place-items: center;
+    font-size: 12px; color: var(--muted);
+  }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
+
+  .hero { display: grid; grid-template-columns: 1fr 380px; gap: 24px; margin-bottom: 20px; }
+  .hero h1 { font-family: system-ui, sans-serif; font-size: 34px; font-weight: 700; letter-spacing: -0.5px; }
+  .hero .sub { color: var(--green); font-size: 13px; margin-top: 10px; }
+  .hero .meta { color: var(--faint); font-size: 12px; margin-top: 22px; }
+
+  .rows { display: flex; flex-direction: column; gap: 8px; }
+  .row {
+    background: var(--row); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px;
+  }
+  .row .icon { color: var(--muted); display: grid; place-items: center; }
+  .row .name { color: var(--muted); }
+  .row .name b { color: var(--ink); font-weight: 600; }
+  .row .val { margin-left: auto; font-size: 14px; }
+  .trend { font-size: 12px; min-width: 58px; text-align: right; }
+  .trend.up { color: var(--green); }
+  .trend.down { color: var(--red); }
+  .trend.flat { color: var(--faint); }
+
+  .grid { display: grid; grid-template-columns: 370px 1fr; gap: 20px; }
+
+  /* ---- gauge ---- */
+  .gauge-wrap { position: relative; display: flex; justify-content: center; padding: 6px 0 0; }
+  .gauge-glow {
+    position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+    width: 160px; height: 120px; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(52, 211, 153, 0.22), transparent 65%);
+  }
+  .gauge-label { position: absolute; top: 108px; left: 0; right: 0; text-align: center; }
+  .gauge-label .tag { font-size: 10px; letter-spacing: 2px; color: var(--faint); }
+  .gauge-label .big { font-size: 40px; font-weight: 600; margin-top: 4px; }
+  .gauge-label .tiny { font-size: 11px; color: var(--faint); margin-top: 4px; }
+  .stats { margin-top: 18px; border-top: 1px solid var(--border); }
+  .stat { display: flex; justify-content: space-between; padding: 13px 4px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .stat:last-child { border-bottom: 0; }
+  .stat .k { color: var(--faint); font-size: 11px; letter-spacing: 1px; }
+  .stat .v { font-size: 15px; }
+
+  /* ---- dot matrix ---- */
+  .usage h2 { font-size: 11px; letter-spacing: 2px; color: var(--faint); font-weight: 500; margin-bottom: 18px; }
+  .track { margin-bottom: 20px; }
+  .track:last-child { margin-bottom: 0; }
+  .track .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .track .head .label { font-size: 13px; color: var(--ink); }
+  .track .head .value { font-size: 20px; font-weight: 600; }
+  .track canvas { width: 100%; height: 34px; display: block; }
+
+  #tip {
+    position: fixed; z-index: 10; pointer-events: none; display: none;
+    background: #0a0c0b; border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 10px; font-size: 12px; color: var(--ink);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+  @media (max-width: 860px) {
+    .hero, .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="brand"><span class="pulse"></span>server-monitor</div>
+    <div class="avatar" id="avatar">··</div>
+  </header>
+
+  <div class="card hero">
+    <div>
+      <h1 id="headline">Everything looks<br />healthy</h1>
+      <div class="sub" id="sub">connecting…</div>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="rows" id="rows"></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="gauge-wrap">
+        <div class="gauge-glow"></div>
+        <svg id="gauge" width="240" height="200" viewBox="0 0 240 200" role="img" aria-label="CPU load gauge"></svg>
+        <div class="gauge-label">
+          <div class="tag">CPU LOAD</div>
+          <div class="big" id="cpu-big">–</div>
+          <div class="tiny" id="cpu-tiny"></div>
+        </div>
+      </div>
+      <div class="stats" id="stats"></div>
+    </div>
+
+    <div class="card usage">
+      <h2>LIVE USAGE — LAST 2 MINUTES</h2>
+      <div id="tracks"></div>
+    </div>
+  </div>
+  <div class="sr-only" role="status" id="sr"></div>
+</div>
+<div id="tip"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const GREEN = '#34d399';
+  const TRACKS = [
+    { key: 'cpu', label: 'cpu' },
+    { key: 'mem', label: 'memory' },
+    { key: 'peak', label: 'peak core' },
+  ];
+  const COLS = 58, ROWS = 3, CELL = 12;
+
+  // ---- build gauge ticks (270° arc, 44 ticks) ----
+  const TICKS = 44;
+  const gauge = $('gauge');
+  for (let i = 0; i < TICKS; i++) {
+    const a = ((135 + (i / (TICKS - 1)) * 270) * Math.PI) / 180;
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    const cx = 120, cy = 100, r1 = 76, r2 = 94;
+    t.setAttribute('x1', cx + r1 * Math.cos(a));
+    t.setAttribute('y1', cy + r1 * Math.sin(a));
+    t.setAttribute('x2', cx + r2 * Math.cos(a));
+    t.setAttribute('y2', cy + r2 * Math.sin(a));
+    t.setAttribute('stroke-width', 5.5);
+    t.setAttribute('stroke-linecap', 'round');
+    gauge.appendChild(t);
+  }
+
+  function drawGauge(pct) {
+    const lit = Math.round((pct / 100) * TICKS);
+    [...gauge.children].forEach((t, i) => {
+      const on = i < lit;
+      t.setAttribute('stroke', on ? GREEN : 'rgba(255,255,255,0.1)');
+      t.style.filter = on && i === lit - 1 ? `drop-shadow(0 0 6px ${GREEN})` : '';
+      t.setAttribute('stroke-opacity', on ? 0.45 + 0.55 * (i / TICKS) : 1);
+    });
+  }
+
+  // ---- build dot-matrix tracks ----
+  const track = {};
+  for (const t of TRACKS) {
+    const el = document.createElement('div');
+    el.className = 'track';
+    el.innerHTML = `<div class="head"><span class="label">${t.label}</span>
+      <span class="value" id="val-${t.key}">–</span></div>
+      <canvas id="cv-${t.key}" aria-label="${t.label} history"></canvas>`;
+    $('tracks').appendChild(el);
+    const cv = el.querySelector('canvas');
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = COLS * CELL * dpr;
+    cv.height = ROWS * CELL * dpr;
+    cv.getContext('2d').scale(dpr, dpr);
+    track[t.key] = cv;
+    cv.addEventListener('mousemove', (e) => tooltip(e, t.key));
+    cv.addEventListener('mouseleave', () => ($('tip').style.display = 'none'));
+  }
+
+  let lastHistory = [];
+  function drawMatrix(cv, values) {
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, COLS * CELL, ROWS * CELL);
+    for (let c = 0; c < COLS; c++) {
+      const v = values[values.length - COLS + c];
+      const litRows = v == null ? 0 : v >= 67 ? 3 : v >= 34 ? 2 : v > 2 ? 1 : 0;
+      for (let r = 0; r < ROWS; r++) {
+        const on = v != null && r >= ROWS - litRows;
+        ctx.beginPath();
+        ctx.arc(c * CELL + CELL / 2, r * CELL + CELL / 2, 2.8, 0, Math.PI * 2);
+        ctx.fillStyle = on ? GREEN : 'rgba(255,255,255,0.07)';
+        ctx.globalAlpha = on ? 0.35 + 0.65 * (v / 100) : 1;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  function tooltip(e, key) {
+    const cv = track[key];
+    const rect = cv.getBoundingClientRect();
+    const col = Math.floor(((e.clientX - rect.left) / rect.width) * COLS);
+    const s = lastHistory[lastHistory.length - COLS + col];
+    const tip = $('tip');
+    if (!s) return (tip.style.display = 'none');
+    tip.textContent = `${s[key]}% · ${new Date(s.t).toLocaleTimeString()}`;
+    tip.style.display = 'block';
+    tip.style.left = e.clientX + 12 + 'px';
+    tip.style.top = e.clientY - 34 + 'px';
+  }
+
+  // ---- helpers ----
+  const fmt = (n) => n.toLocaleString('en-US');
+  const mb = (b) => Math.round(b / 1048576);
+  function ago(s) {
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
+  }
+  function trend(cur, past) {
+    if (past == null || past === 0) return `<span class="trend flat">—</span>`;
+    const d = Math.round(((cur - past) / past) * 100);
+    if (Math.abs(d) < 2) return `<span class="trend flat">—</span>`;
+    return d > 0
+      ? `<span class="trend up">&#8593; ${d}%</span>`
+      : `<span class="trend down">&#8595; ${-d}%</span>`;
+  }
+  const ICON = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+    <rect x="1.5" y="2.5" width="13" height="4.5" rx="1.5"/><rect x="1.5" y="9" width="13" height="4.5" rx="1.5"/>
+    <circle cx="4.5" cy="4.75" r="0.5" fill="currentColor"/><circle cx="4.5" cy="11.25" r="0.5" fill="currentColor"/></svg>`;
+
+  // ---- poll ----
+  async function tick() {
+    let s;
+    try {
+      s = await (await fetch('/api/stats')).json();
+    } catch {
+      $('sub').textContent = 'connection lost — retrying…';
+      return;
+    }
+    const h = s.history;
+    lastHistory = h;
+    const memPct = Math.round((1 - s.mem.free / s.mem.total) * 100);
+    const past = h.length > 61 ? h[h.length - 61] : null; // ~1 min ago
+
+    $('headline').innerHTML = s.cpu > 85 || memPct > 90 ? 'Under heavy<br />load' : 'Everything looks<br />healthy';
+    $('sub').textContent = `${s.hostname} · ${s.platform} · node ${s.node}`;
+    $('meta').textContent = `up ${ago(s.uptime)} · refreshed ${new Date().toLocaleTimeString()}`;
+    $('avatar').textContent = s.hostname.slice(0, 2).toUpperCase();
+
+    $('rows').innerHTML = [
+      ['cpu', s.cpu + '%', trend(s.cpu, past && past.cpu)],
+      ['memory', memPct + '%', trend(memPct, past && past.mem)],
+      ['peak core', Math.max(...s.cores) + '%', trend(Math.max(...s.cores), past && past.peak)],
+    ].map(([n, v, t]) => `<div class="row"><span class="icon">${ICON}</span>
+        <span class="name">${s.hostname.toLowerCase()}/<b>${n}</b></span>
+        <span class="val">${v}</span>${t}</div>`).join('');
+
+    drawGauge(s.cpu);
+    $('cpu-big').textContent = s.cpu + '%';
+    $('cpu-tiny').textContent = `${s.cores.length} cores · ${s.cpuModel.split(' ').slice(0, 2).join(' ')}`;
+
+    $('stats').innerHTML = [
+      ['MEM USED (MB)', fmt(mb(s.mem.total - s.mem.free))],
+      ['MEM FREE (MB)', fmt(mb(s.mem.free))],
+      ['MEM TOTAL (MB)', fmt(mb(s.mem.total))],
+    ].map(([k, v]) => `<div class="stat"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+
+    for (const t of TRACKS) {
+      drawMatrix(track[t.key], h.map((x) => x[t.key]));
+      $('val-' + t.key).textContent = (h.length ? h[h.length - 1][t.key] : 0) + '%';
+    }
+    $('sr').textContent = `CPU ${s.cpu}%, memory ${memPct}%, uptime ${ago(s.uptime)}`;
+  }
+
+  tick();
+  setInterval(tick, 2000);
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "server-monitor",
+  "version": "0.1.0",
+  "description": "Zero-dependency server monitor with a live dark dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT"
+}
